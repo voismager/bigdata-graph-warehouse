@@ -1,0 +1,15 @@
+spring:
+  kafka:
+    consumer:
+      auto-offset-reset: earliest
+      group-id: vk_data_consumers
+      enable-auto-commit: false
+    bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
+
+vk:
+  topic-name: vk_data
+  orientdb:
+    url: ${ORIENTDB_URL}
+    dbName: ${ORIENTDB_DBNAME}
+    username: ${ORIENTDB_USERNAME}
+    password: ${ORIENTDB_PASSWORD}
