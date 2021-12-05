@@ -31,11 +31,19 @@ services:
     environment:
       ORIENTDB_ROOT_PASSWORD: root
 
+  redis:
+    image: bitnami/redis:latest
+    ports:
+      - "6379:6379"
+    environment:
+      ALLOW_EMPTY_PASSWORD: "yes"
+
   kafka-orientdb-sink:
     image: fluffytiger/kafka-orientdb-sink:1.0-SNAPSHOT
     depends_on:
       - kafka
       - orientdb
+      - redis
     ports:
       - "8080:8080"
     environment:
@@ -44,3 +52,5 @@ services:
       ORIENTDB_DBNAME: vk_data
       ORIENTDB_USERNAME: root
       ORIENTDB_PASSWORD: root
+      REDIS_HOSTNAME: redis
+      REDIS_PORT: 6379

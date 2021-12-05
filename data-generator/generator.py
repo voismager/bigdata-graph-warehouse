@@ -5,6 +5,7 @@ from kafka import KafkaProducer
 def gen_data():
     return [
         {
+            "id": "1",
             "type": "Person",
             "properties": {
                 "name": "John",
@@ -12,12 +13,21 @@ def gen_data():
             }
         },
         {
+            "id": "2",
             "type": "Person",
             "properties": {
                 "name": "Ann"
             }
         },
         {
+            "id": "3",
+            "type": "Person",
+            "properties": {
+                "name": "Lisa"
+            }
+        },
+        {
+            "id": "3",
             "type": "Person",
             "properties": {
                 "name": "Lisa"
@@ -27,9 +37,8 @@ def gen_data():
 
 
 def on_send_success(record_metadata):
-    print(record_metadata.topic)
-    print(record_metadata.partition)
-    print(record_metadata.offset)
+    print("Message sent!")
+    print(record_metadata.partition, record_metadata.offset)
 
 
 def on_send_error(err):
