@@ -33,6 +33,8 @@ services:
 
   redis:
     image: bitnami/redis:latest
+    depends_on:
+      - orientdb
     ports:
       - "6379:6379"
     environment:
