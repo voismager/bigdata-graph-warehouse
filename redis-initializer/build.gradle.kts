@@ -18,14 +18,11 @@ dependencies {
 
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin")
     implementation("org.springframework.boot:spring-boot-starter")
-    implementation("org.springframework.kafka:spring-kafka")
     implementation("com.orientechnologies:orientdb-client:3.2.3")
     implementation("org.springframework.data:spring-data-redis")
     implementation("redis.clients:jedis:3.7.0")
 
     testImplementation("org.springframework.boot:spring-boot-starter-test")
-    testImplementation("org.testcontainers:testcontainers:1.16.2")
-    testImplementation("org.testcontainers:kafka:1.16.2")
 }
 
 tasks.test {
@@ -34,7 +31,7 @@ tasks.test {
 
 jib {
     to {
-        image = "fluffytiger/kafka-orientdb-sink"
+        image = "fluffytiger/redis-initializer"
         tags = setOf("$version")
     }
 }

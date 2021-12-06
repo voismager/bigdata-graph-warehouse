@@ -1,4 +1,4 @@
-package org.fluffytiger.orientdbsink
+package org.flullytiger.redis.initializer
 
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.context.properties.ConfigurationPropertiesScan
@@ -9,5 +9,5 @@ import org.springframework.boot.runApplication
 class Application
 
 fun main(args: Array<String>) {
-    runApplication<Application>(*args)
+    runApplication<Application>(*args).close()
 }

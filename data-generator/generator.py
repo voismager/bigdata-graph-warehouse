@@ -1,54 +1,87 @@
 from json import dumps
 from kafka import KafkaProducer
+import random
 
 
 def gen_data():
     return [
         {
-            "type": "Person",
+            "id": "P1",
+            "type": "V",
+            "className": "Person",
             "properties": {
-                "name": "John",
-                "surname": "Doe"
+                "name": "John"
             }
         },
         {
-            "type": "Person",
+            "id": "P2",
+            "type": "V",
+            "className": "Person",
             "properties": {
                 "name": "Ann"
             }
         },
         {
-            "type": "Person",
+            "id": "P3",
+            "type": "V",
+            "className": "Person",
             "properties": {
                 "name": "Lisa"
             }
+        },
+        {
+            "id": "E1",
+            "type": "E",
+            "className": "FriendOf",
+            "properties": {
+                "fromId": "P2",
+                "toId": "P3"
+            }
         }
     ]
-
-
-def on_send_success(record_metadata):
-    print(record_metadata.topic)
-    print(record_metadata.partition)
-    print(record_metadata.offset)
 
 
 def on_send_error(err):
     print(err)
 
 
-def push_data(data):
+def push_data():
     producer = KafkaProducer(
         bootstrap_servers=['localhost:29092'],
         key_serializer=lambda x: x,
         value_serializer=lambda x: dumps(x).encode('utf-8'))
 
-    for i, entity in enumerate(data):
-        producer.send('vk_data', key=bytearray(str(i), 'utf-8'), value=entity) \
-            .add_callback(on_send_success) \
-            .add_errback(on_send_error)
+    for i in range(10000):
+        entity = {
+            "id": f"P{i}",
+            "type": "V",
+            "className": "Person",
+            "properties": {
+            }
+        }
+
+        producer.send('vk_data', key=bytearray(f"P{i}", 'utf-8'), value=entity).add_errback(on_send_error)
+
+        if i > 10 and i % 2 == 0:
+            first = random.randint(0, i)
+            second = random.randint(0, i)
+            while first == second:
+                second = random.randint(0, i)
+
+            link = {
+                "id": f"E{i}",
+                "type": "E",
+                "className": "FriendOf",
+                "properties": {
+                    "fromId": f"P{first}",
+                    "toId": f"P{second}"
+                }
+            }
+
+            producer.send('vk_data', key=bytearray(f"E{i}", 'utf-8'), value=link).add_errback(on_send_error)
 
     producer.flush()
 
 
 if __name__ == '__main__':
-    push_data(gen_data())
+    push_data()
