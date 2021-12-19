@@ -4,6 +4,7 @@ spring:
       auto-offset-reset: earliest
       group-id: vk_data_consumers
       enable-auto-commit: false
+      max-poll-records: ${MAX_POLL_RECORDS}
     bootstrap-servers: ${KAFKA_BOOTSTRAP_SERVERS}
 
 vk:

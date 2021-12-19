@@ -12,15 +12,14 @@ import org.springframework.context.annotation.Configuration
 class OrientDbConfiguration {
     @Bean
     fun orientDb(properties: OrientDbProperties): OrientDB {
-        val config = OrientDBConfig.builder()
-            .addConfig(OGlobalConfiguration.CLIENT_CONNECTION_STRATEGY, "STICKY")
-            .build()
-
         return OrientDB(
             properties.url,
             properties.username,
             properties.password,
-            config
+            OrientDBConfig.builder()
+                .addConfig(OGlobalConfiguration.TX_USE_LOG, false)
+                .addConfig(OGlobalConfiguration.WAL_SYNC_ON_PAGE_FLUSH, false)
+                .build()
         )
     }
 

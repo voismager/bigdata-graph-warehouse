@@ -50,6 +50,7 @@ services:
       - "8080:8080"
     environment:
       KAFKA_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:9092
+      MAX_POLL_RECORDS: 5000
       ORIENTDB_URL: remote:orientdb:2424
       ORIENTDB_DBNAME: vk_data
       ORIENTDB_USERNAME: root

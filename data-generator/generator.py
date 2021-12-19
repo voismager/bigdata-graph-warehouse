@@ -51,11 +51,11 @@ def push_data():
         key_serializer=lambda x: x,
         value_serializer=lambda x: dumps(x).encode('utf-8'))
 
-    for i in range(10000):
+    for i in range(100000):
         entity = {
             "id": f"P{i}",
             "type": "V",
-            "className": "Person",
+            "className": "User",
             "properties": {
             }
         }

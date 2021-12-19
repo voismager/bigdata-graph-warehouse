@@ -1,10 +1,11 @@
 package org.fluffytiger.orientdbsink
 
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.orientechnologies.orient.core.db.ODatabasePool
-import com.orientechnologies.orient.core.db.ODatabaseSession
+import com.orientechnologies.orient.core.intent.OIntentMassiveInsert
 import com.orientechnologies.orient.core.metadata.schema.OClass
 import com.orientechnologies.orient.core.metadata.schema.OType
+import com.orientechnologies.orient.core.record.OEdge
+import com.orientechnologies.orient.core.record.OVertex
 import com.orientechnologies.orient.core.tx.OTransaction
 import org.apache.logging.log4j.LogManager
 import org.fluffytiger.orientdbsink.messages.VkMessage
@@ -12,27 +13,23 @@ import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Service
 import javax.annotation.PostConstruct
 
+
 @Service
 class DbWriter(private val connectionPool: ODatabasePool, private val redis: RedisTemplate<String, String>) {
     private val logger = LogManager.getLogger(DbWriter::class.java)
 
-    private val objectMapper = ObjectMapper()
-
     @PostConstruct
     fun createSchema() {
         connectionPool.acquire().use { db ->
-            if (db.getClass("Vk_Obj") == null) {
-                val vClass = db.createVertexClass("Vk_Obj")
+            if (db.getClass("User") == null) {
+                val vClass = db.createVertexClass("User")
                 vClass.createProperty("_id", OType.STRING)
-                vClass.createProperty("_type", OType.STRING)
-                vClass.createIndex("Vk_Obj_id_index", OClass.INDEX_TYPE.UNIQUE_HASH_INDEX, "_id")
+                vClass.createIndex("User_id_index", OClass.INDEX_TYPE.UNIQUE, "_id")
             }
 
-            if (db.getClass("Vk_Rel") == null) {
-                val eClass = db.createEdgeClass("Vk_Rel")
+            if (db.getClass("FriendOf") == null) {
+                val eClass = db.createEdgeClass("FriendOf")
                 eClass.createProperty("_id", OType.STRING)
-                eClass.createProperty("_type", OType.STRING)
-                eClass.createIndex("Vk_Rel_id_index", OClass.INDEX_TYPE.UNIQUE_HASH_INDEX, "_id")
             }
         }
     }
@@ -40,48 +37,82 @@ class DbWriter(private val connectionPool: ODatabasePool, private val redis: Red
     fun write(messages: List<VkMessage>) {
         logger.info("Got {} messages to write...", messages.size)
 
-        connectionPool.acquire().use { db ->
-            db.begin(OTransaction.TXTYPE.OPTIMISTIC)
+        val type2messages = messages.groupBy { it.type }
 
-            val uniqueMessages = filterNonCached(messages)
-            logger.info("Writing {} messages to db...", uniqueMessages.size)
+        val savedVertices =
+            if (type2messages.containsKey("V")) writeVertices(type2messages.getOrDefault("V", listOf()))
+            else mutableMapOf()
 
-            for (message in uniqueMessages) {
-                if (message.type == "V") {
-                    writeVertex(db, message)
-                } else if (message.type == "E") {
-                    writeEdge(db, message)
-                }
-            }
-
-            this.updateCache(uniqueMessages)
-            db.commit()
+        if (type2messages.containsKey("E")) {
+            writeEdges(type2messages.getOrDefault("E", listOf()), savedVertices)
         }
 
         logger.info("Written successfully!", messages.size)
     }
 
-    private fun writeVertex(db: ODatabaseSession, message: VkMessage) {
-        val properties = mutableMapOf<String, String>()
-        properties.putAll(message.properties)
-        properties["_id"] = message.id
-        properties["_type"] = message.className
+    private fun writeVertices(messages: List<VkMessage>): MutableMap<String, OVertex> {
+        val savedVertices = HashMap<String, OVertex>()
 
-        val statement = "CREATE VERTEX Vk_Obj CONTENT ${objectMapper.writeValueAsString(properties)}"
+        connectionPool.acquire().use { db ->
+            db.declareIntent(OIntentMassiveInsert())
+            db.begin(OTransaction.TXTYPE.OPTIMISTIC)
 
-        db.execute("sql", statement).close()
+            //val uniqueMessages = filterNonCached(messages)
+            //logger.info("Writing {} messages to db...", uniqueMessages.size)
+
+            for (message in messages) {
+                val doc = db.newVertex(message.className)
+                doc.setProperty("_id", message.id)
+                for ((k, v) in message.properties) {
+                    doc.setProperty(k, v)
+                }
+                doc.save<OVertex>()
+                savedVertices[message.id] = doc
+            }
+
+            //this.updateCache(uniqueMessages)
+            db.commit()
+            db.declareIntent(null)
+        }
+
+        logger.info("Wrote {} vertices", savedVertices.size)
+        return savedVertices
     }
 
-    private fun writeEdge(db: ODatabaseSession, message: VkMessage) {
-        val fromId = message.properties["fromId"]!!
-        val toId = message.properties["toId"]!!
+    private fun writeEdges(messages: List<VkMessage>, cache: MutableMap<String, OVertex>) {
+        val offCacheIds = messages
+            .flatMap { listOf(it.properties["fromId"]!!, it.properties["toId"]!!) }
+            .filter { !cache.containsKey(it) }
 
-        val statement = "CREATE EDGE Vk_Rel " +
-            "FROM (SELECT FROM Vk_Obj WHERE _id = ?) " +
-            "TO (SELECT FROM Vk_Obj WHERE _id = ?) " +
-            "SET _id = ?, _type = ?"
+        connectionPool.acquire().use { db ->
+            val inStatement = offCacheIds.joinToString(separator = ",") { "'$it'" }
+            val result = db.query("SELECT FROM User WHERE _id in [$inStatement]")
+            while (result.hasNext()) {
+                val vertex = result.next().vertex.get()
+                cache[vertex.getProperty("_id")] = vertex
+            }
+            logger.info("Added {} vertices to cache", offCacheIds.size)
+        }
 
-        db.execute("sql", statement, fromId, toId, message.id, message.className).close()
+        var written = 0
+
+        connectionPool.acquire().use { db ->
+            db.declareIntent(OIntentMassiveInsert())
+            db.begin(OTransaction.TXTYPE.OPTIMISTIC)
+
+            for (message in messages) {
+                val fromId = message.properties["fromId"]!!
+                val toId = message.properties["toId"]!!
+                val doc = db.newEdge(cache[fromId], cache[toId], message.className)
+                doc.save<OEdge>()
+                written++
+            }
+
+            db.commit()
+            db.declareIntent(null)
+        }
+
+        logger.info("Wrote {} edges", written)
     }
 
     private fun filterNonCached(messages: List<VkMessage>): List<VkMessage> {
