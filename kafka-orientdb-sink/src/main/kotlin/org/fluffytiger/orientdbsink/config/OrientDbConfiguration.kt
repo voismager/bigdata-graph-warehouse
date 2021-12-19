@@ -1,5 +1,6 @@
 package org.fluffytiger.orientdbsink.config
 
+import com.orientechnologies.orient.core.config.OGlobalConfiguration
 import com.orientechnologies.orient.core.db.ODatabasePool
 import com.orientechnologies.orient.core.db.ODatabaseType
 import com.orientechnologies.orient.core.db.OrientDB
@@ -15,7 +16,10 @@ class OrientDbConfiguration {
             properties.url,
             properties.username,
             properties.password,
-            OrientDBConfig.defaultConfig()
+            OrientDBConfig.builder()
+                .addConfig(OGlobalConfiguration.TX_USE_LOG, false)
+                .addConfig(OGlobalConfiguration.WAL_SYNC_ON_PAGE_FLUSH, false)
+                .build()
         )
     }
 

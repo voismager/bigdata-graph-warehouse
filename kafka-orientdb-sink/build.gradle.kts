@@ -20,6 +20,7 @@ dependencies {
     implementation("org.springframework.boot:spring-boot-starter")
     implementation("org.springframework.kafka:spring-kafka")
     implementation("com.orientechnologies:orientdb-client:3.2.3")
+    implementation("com.orientechnologies:orientdb-graphdb:3.2.3:")
     implementation("org.springframework.data:spring-data-redis")
     implementation("redis.clients:jedis:3.7.0")
 
