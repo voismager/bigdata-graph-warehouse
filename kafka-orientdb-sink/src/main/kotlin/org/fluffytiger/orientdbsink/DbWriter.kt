@@ -23,7 +23,7 @@ class DbWriter(
     fun write(messages: List<VkMessage>) {
         logger.info("Got {} messages to write...", messages.size)
 
-        val type2messages = messages.groupBy { it.type }
+        val type2messages = messages.groupBy { it.typeName }
 
         val savedVertices =
             if (type2messages.containsKey("V")) writeVertices(type2messages.getOrDefault("V", listOf()))

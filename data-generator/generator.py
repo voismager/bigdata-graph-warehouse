@@ -3,44 +3,6 @@ from kafka import KafkaProducer
 import random
 
 
-def gen_data():
-    return [
-        {
-            "id": "P1",
-            "type": "V",
-            "className": "Person",
-            "properties": {
-                "name": "John"
-            }
-        },
-        {
-            "id": "P2",
-            "type": "V",
-            "className": "Person",
-            "properties": {
-                "name": "Ann"
-            }
-        },
-        {
-            "id": "P3",
-            "type": "V",
-            "className": "Person",
-            "properties": {
-                "name": "Lisa"
-            }
-        },
-        {
-            "id": "E1",
-            "type": "E",
-            "className": "FriendOf",
-            "properties": {
-                "fromId": "P2",
-                "toId": "P3"
-            }
-        }
-    ]
-
-
 def on_send_error(err):
     print(err)
 
@@ -54,7 +16,7 @@ def push_data():
     for i in range(50000):
         entity = {
             "id": f"P{i}",
-            "type": "V",
+            "typeName": "V",
             "className": "User",
             "properties": {
             }
@@ -71,7 +33,7 @@ def push_data():
 
             link = {
                 "id": f"E{i}",
-                "type": "E",
+                "typeName": "E",
                 "className": "FriendOf",
                 "properties": {
                     "fromId": f"P{first}",
