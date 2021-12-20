@@ -2,37 +2,23 @@ package org.fluffytiger.orientdbsink
 
 import com.orientechnologies.orient.core.db.ODatabasePool
 import com.orientechnologies.orient.core.intent.OIntentMassiveInsert
-import com.orientechnologies.orient.core.metadata.schema.OClass
-import com.orientechnologies.orient.core.metadata.schema.OType
 import com.orientechnologies.orient.core.record.OEdge
 import com.orientechnologies.orient.core.record.OVertex
 import com.orientechnologies.orient.core.tx.OTransaction
 import org.apache.logging.log4j.LogManager
+import org.fluffytiger.orientdbsink.config.OrientDbProperties
 import org.fluffytiger.orientdbsink.messages.VkMessage
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Service
-import javax.annotation.PostConstruct
 
 
 @Service
-class DbWriter(private val connectionPool: ODatabasePool, private val redis: RedisTemplate<String, String>) {
+class DbWriter(
+    private val connectionPool: ODatabasePool,
+    private val redis: RedisTemplate<String, String>,
+    private val orientDB: OrientDbProperties
+) {
     private val logger = LogManager.getLogger(DbWriter::class.java)
-
-    @PostConstruct
-    fun createSchema() {
-        connectionPool.acquire().use { db ->
-            if (db.getClass("User") == null) {
-                val vClass = db.createVertexClass("User")
-                vClass.createProperty("_id", OType.STRING)
-                vClass.createIndex("User_id_index", OClass.INDEX_TYPE.UNIQUE, "_id")
-            }
-
-            if (db.getClass("FriendOf") == null) {
-                val eClass = db.createEdgeClass("FriendOf")
-                eClass.createProperty("_id", OType.STRING)
-            }
-        }
-    }
 
     fun write(messages: List<VkMessage>) {
         logger.info("Got {} messages to write...", messages.size)
@@ -66,7 +52,7 @@ class DbWriter(private val connectionPool: ODatabasePool, private val redis: Red
                 for ((k, v) in message.properties) {
                     doc.setProperty(k, v)
                 }
-                doc.save<OVertex>()
+                doc.save<OVertex>(message.className.lowercase() + orientDB.clusterSuffix)
                 savedVertices[message.id] = doc
             }
 
@@ -104,7 +90,7 @@ class DbWriter(private val connectionPool: ODatabasePool, private val redis: Red
                 val fromId = message.properties["fromId"]!!
                 val toId = message.properties["toId"]!!
                 val doc = db.newEdge(cache[fromId], cache[toId], message.className)
-                doc.save<OEdge>()
+                doc.save<OEdge>(message.className.lowercase() + orientDB.clusterSuffix)
                 written++
             }
 

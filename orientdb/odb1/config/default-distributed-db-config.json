@@ -1,0 +1,28 @@
+{
+  "autoDeploy": true,
+  "hotAlignment" : true,
+  "executionMode": "undefined",
+  "readQuorum": 1,
+  "writeQuorum": 1,
+  "readYourWrites": true,
+  "newNodeStrategy": "static",
+  "servers": {
+    "odb1": "master",
+    "odb2": "master"
+  },
+  "clusters": {
+    "internal": {
+    },
+    "user_1": {
+      "owner" : "odb1",
+      "servers" : ["odb1"]
+    },
+    "user_2": {
+      "owner" : "odb2",
+      "servers" : ["odb2"]
+    },
+    "*": {
+      "servers": ["<NEW_NODE>"]
+    }
+  }
+}

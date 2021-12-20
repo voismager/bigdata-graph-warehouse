@@ -27,7 +27,7 @@ class KafkaConfiguration {
     @Bean
     fun vkTopic(): NewTopic {
         return TopicBuilder.name(topicName)
-            .partitions(1)
+            .partitions(2)
             .replicas(1)
             .build()
     }

@@ -51,7 +51,7 @@ def push_data():
         key_serializer=lambda x: x,
         value_serializer=lambda x: dumps(x).encode('utf-8'))
 
-    for i in range(100000):
+    for i in range(50000):
         entity = {
             "id": f"P{i}",
             "type": "V",
@@ -60,7 +60,8 @@ def push_data():
             }
         }
 
-        producer.send('vk_data', key=bytearray(f"P{i}", 'utf-8'), value=entity).add_errback(on_send_error)
+        producer.send('vk_data', key=bytearray(f"P{i}", 'utf-8'), value=entity, partition=i % 2) \
+            .add_errback(on_send_error)
 
         if i > 10 and i % 2 == 0:
             first = random.randint(0, i)
@@ -78,7 +79,8 @@ def push_data():
                 }
             }
 
-            producer.send('vk_data', key=bytearray(f"E{i}", 'utf-8'), value=link).add_errback(on_send_error)
+            producer.send('vk_data', key=bytearray(f"E{i}", 'utf-8'), value=link, partition=random.randint(0, 1)) \
+                .add_errback(on_send_error)
 
     producer.flush()
 

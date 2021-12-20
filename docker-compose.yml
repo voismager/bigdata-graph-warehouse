@@ -23,37 +23,87 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
-  orientdb:
-    image: orientdb:latest
-    ports:
-      - "2424:2424"
-      - "2480:2480"
-    environment:
-      ORIENTDB_ROOT_PASSWORD: root
-
   redis:
     image: bitnami/redis:latest
-    depends_on:
-      - orientdb
     ports:
       - "6379:6379"
     environment:
       ALLOW_EMPTY_PASSWORD: "yes"
 
-  kafka-orientdb-sink:
+  kafka-orientdb-sink1:
     image: fluffytiger/kafka-orientdb-sink:1.0-SNAPSHOT
     depends_on:
       - kafka
-      - orientdb
+      - odb1
+      - odb2
       - redis
     ports:
       - "8080:8080"
+    restart: always
     environment:
       KAFKA_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:9092
       MAX_POLL_RECORDS: 5000
-      ORIENTDB_URL: remote:orientdb:2424
+      ORIENTDB_URL: remote:odb1:2424
       ORIENTDB_DBNAME: vk_data
       ORIENTDB_USERNAME: root
       ORIENTDB_PASSWORD: root
+      ORIENTDB_SUFFIX: _1
       REDIS_HOSTNAME: redis
       REDIS_PORT: 6379
+
+  kafka-orientdb-sink2:
+    image: fluffytiger/kafka-orientdb-sink:1.0-SNAPSHOT
+    depends_on:
+      - kafka
+      - odb1
+      - odb2
+      - redis
+    ports:
+      - "8081:8080"
+    restart: always
+    environment:
+      KAFKA_BOOTSTRAP_SERVERS: PLAINTEXT://kafka:9092
+      MAX_POLL_RECORDS: 5000
+      ORIENTDB_URL: remote:odb2:2424
+      ORIENTDB_DBNAME: vk_data
+      ORIENTDB_USERNAME: root
+      ORIENTDB_PASSWORD: root
+      ORIENTDB_SUFFIX: _2
+      REDIS_HOSTNAME: redis
+      REDIS_PORT: 6379
+
+  odb-init:
+    image: orientdb:latest
+    volumes:
+      - ./orientdb-init:/var/scripts
+    depends_on:
+      - odb1
+      - odb2
+    environment:
+      ORIENTDB_ROOT_PASSWORD: root
+    restart: "no"
+    command: sh -c "sleep 60 && console.sh /var/scripts/setup.txt"
+
+  odb1:
+    image: orientdb:latest
+    command: dserver.sh
+    volumes:
+      - ./orientdb/odb1/config:/orientdb/config
+      - ./orientdb/odb1/databases:/orientdb/databases
+    environment:
+      ORIENTDB_ROOT_PASSWORD: root
+      ORIENTDB_NODE_NAME: odb1
+    ports:
+      - "2481:2480"
+
+  odb2:
+    image: orientdb:latest
+    command: dserver.sh
+    volumes:
+      - ./orientdb/odb2/config:/orientdb/config
+      - ./orientdb/odb2/databases:/orientdb/databases
+    environment:
+      ORIENTDB_ROOT_PASSWORD: root
+      ORIENTDB_NODE_NAME: odb2
+    ports:
+      - "2482:2480"

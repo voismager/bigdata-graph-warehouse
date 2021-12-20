@@ -9,5 +9,6 @@ data class OrientDbProperties(
     val url: String,
     val dbName: String,
     val username: String,
-    val password: String
+    val password: String,
+    val clusterSuffix: String
 )

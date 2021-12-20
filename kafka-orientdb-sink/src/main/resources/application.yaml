@@ -14,6 +14,7 @@ vk:
     dbName: ${ORIENTDB_DBNAME}
     username: ${ORIENTDB_USERNAME}
     password: ${ORIENTDB_PASSWORD}
+    clusterSuffix: ${ORIENTDB_SUFFIX}
   redis:
     hostname: ${REDIS_HOSTNAME}
     port: ${REDIS_PORT}

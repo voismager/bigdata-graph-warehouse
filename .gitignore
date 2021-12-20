@@ -41,3 +41,6 @@ _gsdata_
 # misc stuff
 *.bak
 *.log
+
+/orientdb/odb1/databases
+/orientdb/odb2/databases
