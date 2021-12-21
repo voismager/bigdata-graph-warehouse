@@ -25,7 +25,6 @@ class OrientDbConfiguration {
 
     @Bean
     fun orientDbSessionPool(orientDB: OrientDB, properties: OrientDbProperties): ODatabasePool {
-        orientDB.createIfNotExists(properties.dbName, ODatabaseType.PLOCAL)
         return orientDB.cachedPool(properties.dbName, properties.username, properties.password)
     }
 }
