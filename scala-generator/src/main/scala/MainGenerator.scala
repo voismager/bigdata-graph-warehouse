@@ -15,6 +15,8 @@ object MainGenerator extends App {
   val FRIENDS_SINK = Properties.envOrElse("FRIENDS_SINK", mainStreamConf.getString("kafka.friends.sink"))
   val PROFILES_SINK = Properties.envOrElse("PROFILES_SINK", mainStreamConf.getString("kafka.profiles.sink"))
 
+  val timestamp = System.currentTimeMillis / 1000
+
   val spark: SparkSession = SparkSession.builder()
     .appName("Generator")
     .master(SPARK_MASTER)
@@ -26,18 +28,18 @@ object MainGenerator extends App {
 
   val profiles = spark.readStream
     .schema(schemaProfiles)
-    .json("C:\\studying\\itmo\\big_data_fall_2021\\bigdata-graph-warehouse\\generator\\src\\main\\resources\\user_profiles")
+    .json("src/main/resources/user_profiles")
     .select("id", "first_name", "last_name")
     .selectExpr("CAST(id AS STRING) AS key", "to_json(struct(*)) AS value")
     .writeStream
     .format("kafka")
     .option("kafka.bootstrap.servers", BOOTSTRAP_SERVERS)
     .option("topic", PROFILES_SINK)
-    .option("checkpointLocation", "C:\\tmp\\checkpoint179")
+    .option("checkpointLocation", s"tmp/${timestamp}_profiles")
 
   val friends = spark.readStream
     .schema(schemaFriends)
-    .json("C:\\studying\\itmo\\big_data_fall_2021\\bigdata-graph-warehouse\\generator\\src\\main\\resources\\friends")
+    .json("src/main/resources/friends")
     .select("user_id", "friend_id")
     .withColumn("id", concat(col("user_id"), lit('.'), col("friend_id")))
     .selectExpr("CAST(id AS STRING) AS key", "to_json(struct(*)) AS value")
@@ -45,7 +47,7 @@ object MainGenerator extends App {
     .format("kafka")
     .option("kafka.bootstrap.servers", BOOTSTRAP_SERVERS)
     .option("topic", FRIENDS_SINK)
-    .option("checkpointLocation", "C:\\tmp\\checkpoint173")
+    .option("checkpointLocation", s"tmp/${timestamp}_friends")
 
   friends.start()
   profiles.start()

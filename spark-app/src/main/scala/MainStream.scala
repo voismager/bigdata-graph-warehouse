@@ -26,6 +26,8 @@ object MainStream extends App {
   val schemaProfiles = DataType.fromJson(mainStreamConf.getString("schema.profiles")).asInstanceOf[StructType]
   val schemaFriends = DataType.fromJson(mainStreamConf.getString("schema.friends")).asInstanceOf[StructType]
 
+  val timestamp = System.currentTimeMillis / 1000
+
   val spark: SparkSession = SparkSession.builder()
     .appName("SparkApp")
     .master(SPARK_MASTER)
@@ -49,11 +51,11 @@ object MainStream extends App {
     .as[Friend]
 
   profiles.map(profile => Message(profile.id, "V", "Person", Map("name" -> s"${profile.firstName} ${profile.lastName}")))
-    .writeToKafka("vk_data", "/tmp/chckpnt/test1")
+    .writeToKafka("vk_data", "Person")
     .start()
 
   join.map(friend => Message(friend.linkId, "E", "FriendOf", Map("fromId" -> friend.userId, "toId" -> friend.friendId)))
-    .writeToKafka("vk_data", "/tmp/chckpnt/test2")
+    .writeToKafka("vk_data", "FriendOf")
     .start()
     .awaitTermination()
 
@@ -75,7 +77,7 @@ object MainStream extends App {
       .format("kafka")
       .option("kafka.bootstrap.servers", BOOTSTRAP_SERVERS)
       .option("topic", topic)
-      .option("checkpointLocation", checkpoint)
+      .option("checkpointLocation", s"tmp/${timestamp}_${topic}_$checkpoint")
 
     def deserializeAs[T : Encoder](schema: DataType, exprs: String*): Dataset[T] = df
       .selectExpr("CAST(value AS STRING)")
