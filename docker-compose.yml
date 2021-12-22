@@ -23,6 +23,22 @@ services:
       KAFKA_INTER_BROKER_LISTENER_NAME: PLAINTEXT
       KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
 
+  spark-streaming:
+    image: spark-streaming/spark-streaming:latest
+    depends_on:
+      - generator
+      - kafka
+    ports:
+      - "4040:4040"
+    environment:
+      SPARK_MASTER: local[*]
+      SPARK_UI_PORT: 4040
+      BOOTSTRAP_SERVERS: PLAINTEXT://kafka:9092
+      FRIENDS_SOURCE: friends
+      FRIENDS_SINK: vk_data
+      PROFILES_SOURCE: profiles
+      PROFILES_SINK: vk_data
+
   redis:
     image: bitnami/redis:latest
     ports:
