@@ -18,7 +18,6 @@ import org.springframework.stereotype.Service
 class DbWriter(
     private val connectionPool: ODatabasePool,
     private val redis: RedisTemplate<String, String>,
-    private val orientDB: OrientDbProperties,
     redisProperties: RedisProperties
 ) {
     private val logger = LogManager.getLogger(DbWriter::class.java)
@@ -29,17 +28,17 @@ class DbWriter(
         logger.info("Got {} messages to write...", messages.size)
 
         val idsToInsert = getNonDuplicatedIdsFromRedis(messages)
-        val messagesToInsert = messages.filter { idsToInsert.contains(it.id) }
+        val messagesToInsert = messages.toSet().filter { idsToInsert.contains(it.id) }
         logger.info("Writing {} unique messages to db...", messagesToInsert.size)
 
         val type2messages = messagesToInsert.groupBy { it.typeName }
 
-        val savedVertices =
-            if (type2messages.containsKey("V")) writeVertices(type2messages.getOrDefault("V", listOf()))
-            else mutableMapOf()
+        if (type2messages.containsKey("V")) {
+            writeVertices(type2messages.getOrDefault("V", listOf()))
+        }
 
         if (type2messages.containsKey("E")) {
-            writeEdges(type2messages.getOrDefault("E", listOf()), savedVertices)
+            writeEdges(type2messages.getOrDefault("E", listOf()))
         }
 
         addToRedis(idsToInsert)
@@ -47,9 +46,7 @@ class DbWriter(
         logger.info("Written successfully!")
     }
 
-    private fun writeVertices(messages: List<VkMessage>): MutableMap<String, OVertex> {
-        val savedVertices = HashMap<String, OVertex>()
-
+    private fun writeVertices(messages: List<VkMessage>) {
         connectionPool.acquire().use { db ->
             db.declareIntent(OIntentMassiveInsert())
             db.begin(OTransaction.TXTYPE.OPTIMISTIC)
@@ -66,30 +63,39 @@ class DbWriter(
                     doc.setProperty(k, v)
                 }
                 doc.save<OVertex>()
-                savedVertices[message.id] = doc
             }
 
             db.commit()
             db.declareIntent(null)
         }
 
-        logger.info("Wrote {} vertices", savedVertices.size)
-        return savedVertices
+        logger.info("Wrote {} vertices", messages.size)
     }
 
-    private fun writeEdges(messages: List<VkMessage>, cache: MutableMap<String, OVertex>) {
+    private data class OffCacheVertex(val id: String, val className: String)
+
+    private fun writeEdges(messages: List<VkMessage>) {
         val offCacheIds = messages
-            .flatMap { listOf(it.properties["fromId"]!!, it.properties["toId"]!!) }
-            .filter { !cache.containsKey(it) }
+            .flatMap {
+                listOf(
+                    OffCacheVertex(it.properties["fromId"]!!, it.properties["fromClass"]!!),
+                    OffCacheVertex(it.properties["toId"]!!, it.properties["toClass"]!!)
+                )
+            }
+            .groupBy { it.className }
+
+        val cache: MutableMap<String, OVertex> = mutableMapOf()
 
         connectionPool.acquire().use { db ->
-            val inStatement = offCacheIds.joinToString(separator = ",") { "'$it'" }
-            val result = db.query("SELECT FROM User WHERE _id in [$inStatement]")
-            while (result.hasNext()) {
-                val vertex = result.next().vertex.get()
-                cache[vertex.getProperty("_id")] = vertex
+            for ((className, group) in offCacheIds) {
+                val inStatement = group.joinToString(separator = ",") { "'${it.id}'" }
+                val result = db.query("SELECT FROM $className WHERE _id in [$inStatement]")
+                while (result.hasNext()) {
+                    val vertex = result.next().vertex.get()
+                    cache[vertex.getProperty("_id")] = vertex
+                }
+                logger.info("Added {} vertices of class {} to cache", group.size, className)
             }
-            logger.info("Added {} vertices to cache", offCacheIds.size)
         }
 
         var written = 0
@@ -106,9 +112,18 @@ class DbWriter(
 
                 val fromId = message.properties["fromId"]!!
                 val toId = message.properties["toId"]!!
-                val doc = db.newEdge(cache[fromId], cache[toId], dbClasses[message.className])
-                doc.save<OEdge>()
-                written++
+                val from = cache[fromId]
+                val to = cache[toId]
+
+                if (from == null || to == null) {
+                    logger.error("Some vertices are null: from = {}, to = {}", from, to)
+                    logger.error("fromId = {}, toId = {}", fromId, toId)
+                    logger.error("Skipping")
+                } else {
+                    val doc = db.newEdge(from, to, dbClasses[message.className])
+                    doc.save<OEdge>()
+                    written++
+                }
             }
 
             db.commit()
