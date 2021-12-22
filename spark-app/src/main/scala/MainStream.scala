@@ -5,6 +5,8 @@ import org.apache.spark.sql.streaming.DataStreamWriter
 import org.apache.spark.sql.types._
 import org.apache.spark.sql.{DataFrame, Dataset, Encoder, Row, SparkSession}
 
+import scala.util.Properties
+
 case class Person(id: String, firstName: String, lastName: String)
 case class Friend(linkId: String, userId: String, friendId: String)
 
@@ -13,19 +15,19 @@ case class Message(id: String, typeName: String, className: String, properties: 
 object MainStream extends App {
   val mainStreamConf: Config = ConfigFactory.load()
 
-  val SPARK_MASTER      = mainStreamConf.getString("mainstream.spark.master")
-  val SPARK_UI_PORT     = mainStreamConf.getString("mainstream.spark.ui.port")
-  val BOOTSTRAP_SERVERS = mainStreamConf.getString("kafka.bootstrap.servers")
-  val FRIENDS_SOURCE    = mainStreamConf.getString("kafka.friends.source")
-  val FRIENDS_SINK      = mainStreamConf.getString("kafka.friends.sink")
-  val PROFILES_SOURCE   = mainStreamConf.getString("kafka.profiles.source")
-  val PROFILES_SINK     = mainStreamConf.getString("kafka.profiles.sink")
+  val SPARK_MASTER      = Properties.envOrElse("SPARK_MASTER", mainStreamConf.getString("mainstream.spark.master"))
+  val SPARK_UI_PORT     = Properties.envOrElse("SPARK_UI_PORT", mainStreamConf.getString("mainstream.spark.ui.port"))
+  val BOOTSTRAP_SERVERS = Properties.envOrElse("BOOTSTRAP_SERVERS", mainStreamConf.getString("kafka.bootstrap.servers"))
+  val FRIENDS_SOURCE    = Properties.envOrElse("FRIENDS_SOURCE", mainStreamConf.getString("kafka.friends.source"))
+  val FRIENDS_SINK      = Properties.envOrElse("FRIENDS_SINK", mainStreamConf.getString("kafka.friends.sink"))
+  val PROFILES_SOURCE   = Properties.envOrElse("PROFILES_SOURCE", mainStreamConf.getString("kafka.profiles.source"))
+  val PROFILES_SINK     = Properties.envOrElse("PROFILES_SINK", mainStreamConf.getString("kafka.profiles.sink"))
 
-  val schemaFriends: DataType = DataType.fromJson("{\"type\":\"struct\",\"fields\":[{\"name\":\"user_id\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}},{\"name\":\"friend_id\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}},{\"name\":\"id\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}}]}")
-  val schemaProfiles: DataType = DataType.fromJson("{\"type\":\"struct\",\"fields\":[{\"name\":\"id\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}},{\"name\":\"first_name\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}},{\"name\":\"last_name\",\"type\":\"string\",\"nullable\":true,\"metadata\":{}}]}")
+  val schemaProfiles = DataType.fromJson(mainStreamConf.getString("schema.profiles")).asInstanceOf[StructType]
+  val schemaFriends = DataType.fromJson(mainStreamConf.getString("schema.friends")).asInstanceOf[StructType]
 
   val spark: SparkSession = SparkSession.builder()
-    .appName("mainStream")
+    .appName("SparkApp")
     .master(SPARK_MASTER)
     .config("spark.ui.port", SPARK_UI_PORT)
     .getOrCreate()
@@ -50,7 +52,7 @@ object MainStream extends App {
     .writeToKafka("vk_data", "/tmp/chckpnt/test1")
     .start()
 
-  join.map(friend => Message(friend.friendId, "E", "FriendOf", Map("fromId" -> friend.userId, "toId" -> friend.friendId)))
+  join.map(friend => Message(friend.linkId, "E", "FriendOf", Map("fromId" -> friend.userId, "toId" -> friend.friendId)))
     .writeToKafka("vk_data", "/tmp/chckpnt/test2")
     .start()
     .awaitTermination()
