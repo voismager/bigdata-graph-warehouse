@@ -25,8 +25,8 @@ def push_data():
         }
 
         print(user)
-        #producer.send('vk_data', key=bytearray(f"P{i}", 'utf-8'), value=user, partition=0) \
-        #    .add_errback(on_send_error)
+        producer.send('vk_data', key=bytearray(f"P{i}", 'utf-8'), value=user, partition=0) \
+            .add_errback(on_send_error)
 
     for i in range(total_posts):
         post = {
@@ -37,8 +37,8 @@ def push_data():
         }
 
         print(post)
-        #producer.send('vk_data', key=bytearray(f"P{i}", 'utf-8'), value=post, partition=0) \
-        #    .add_errback(on_send_error)
+        producer.send('vk_data', key=bytearray(f"P{i}", 'utf-8'), value=post, partition=0) \
+            .add_errback(on_send_error)
 
     for i in range(int(total_users / 2)):
         user_1_id = f"User_{i}"
