@@ -7,5 +7,7 @@ import org.springframework.boot.context.properties.ConstructorBinding
 @ConfigurationProperties(prefix = "vk.redis")
 data class RedisProperties(
     val hostname: String,
-    val port: Int
+    val port: Int,
+    val collectionName: String,
+    val batchInsertSize: Int
 )
