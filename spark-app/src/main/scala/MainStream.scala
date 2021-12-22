@@ -50,11 +50,12 @@ object MainStream extends App {
     .select("linkId", "userId", "friendId")
     .as[Friend]
 
-  profiles.map(profile => Message(profile.id, "V", "Person", Map("name" -> s"${profile.firstName} ${profile.lastName}")))
+  profiles.map(profile => Message(profile.id, "V", "User", Map("name" -> s"${profile.firstName} ${profile.lastName}")))
     .writeToKafka("vk_data", "Person")
     .start()
 
   join.map(friend => Message(friend.linkId, "E", "FriendOf", Map("fromId" -> friend.userId, "toId" -> friend.friendId)))
+    .dropDuplicates("id")
     .writeToKafka("vk_data", "FriendOf")
     .start()
     .awaitTermination()
