@@ -46,6 +46,20 @@ services:
     environment:
       ALLOW_EMPTY_PASSWORD: "yes"
 
+  redis-init:
+    image: fluffytiger/redis-initializer:1.0-SNAPSHOT
+    depends_on:
+      - redis
+      - odb1
+      - odb2
+    environment:
+      ORIENTDB_URL: remote:odb1:2424
+      ORIENTDB_DBNAME: vk_data
+      ORIENTDB_USERNAME: root
+      ORIENTDB_PASSWORD: root
+      REDIS_HOSTNAME: redis
+      REDIS_PORT: 6379
+
   kafka-orientdb-sink1:
     image: fluffytiger/kafka-orientdb-sink:1.0-SNAPSHOT
     depends_on:
@@ -98,7 +112,7 @@ services:
     environment:
       ORIENTDB_ROOT_PASSWORD: root
     restart: "no"
-    command: sh -c "sleep 60 && console.sh /var/scripts/setup.txt"
+    command: sh -c "sleep 90 && console.sh /var/scripts/setup.txt"
 
   odb1:
     image: orientdb:latest

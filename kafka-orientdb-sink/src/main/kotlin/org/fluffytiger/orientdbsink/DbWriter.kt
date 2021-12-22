@@ -2,11 +2,13 @@ package org.fluffytiger.orientdbsink
 
 import com.orientechnologies.orient.core.db.ODatabasePool
 import com.orientechnologies.orient.core.intent.OIntentMassiveInsert
+import com.orientechnologies.orient.core.metadata.schema.OClass
 import com.orientechnologies.orient.core.record.OEdge
 import com.orientechnologies.orient.core.record.OVertex
 import com.orientechnologies.orient.core.tx.OTransaction
 import org.apache.logging.log4j.LogManager
 import org.fluffytiger.orientdbsink.config.OrientDbProperties
+import org.fluffytiger.orientdbsink.config.RedisProperties
 import org.fluffytiger.orientdbsink.messages.VkMessage
 import org.springframework.data.redis.core.RedisTemplate
 import org.springframework.stereotype.Service
@@ -16,14 +18,21 @@ import org.springframework.stereotype.Service
 class DbWriter(
     private val connectionPool: ODatabasePool,
     private val redis: RedisTemplate<String, String>,
-    private val orientDB: OrientDbProperties
+    private val orientDB: OrientDbProperties,
+    redisProperties: RedisProperties
 ) {
     private val logger = LogManager.getLogger(DbWriter::class.java)
+
+    private val collectionName = redisProperties.collectionName
 
     fun write(messages: List<VkMessage>) {
         logger.info("Got {} messages to write...", messages.size)
 
-        val type2messages = messages.groupBy { it.typeName }
+        val idsToInsert = getNonDuplicatedIdsFromRedis(messages)
+        val messagesToInsert = messages.filter { idsToInsert.contains(it.id) }
+        logger.info("Writing {} unique messages to db...", messagesToInsert.size)
+
+        val type2messages = messagesToInsert.groupBy { it.typeName }
 
         val savedVertices =
             if (type2messages.containsKey("V")) writeVertices(type2messages.getOrDefault("V", listOf()))
@@ -33,7 +42,9 @@ class DbWriter(
             writeEdges(type2messages.getOrDefault("E", listOf()), savedVertices)
         }
 
-        logger.info("Written successfully!", messages.size)
+        addToRedis(idsToInsert)
+
+        logger.info("Written successfully!")
     }
 
     private fun writeVertices(messages: List<VkMessage>): MutableMap<String, OVertex> {
@@ -43,20 +54,21 @@ class DbWriter(
             db.declareIntent(OIntentMassiveInsert())
             db.begin(OTransaction.TXTYPE.OPTIMISTIC)
 
-            //val uniqueMessages = filterNonCached(messages)
-            //logger.info("Writing {} messages to db...", uniqueMessages.size)
+            val dbClasses = mutableMapOf<String, OClass>()
 
             for (message in messages) {
-                val doc = db.newVertex(message.className)
+                if (!dbClasses.containsKey(message.className))
+                    dbClasses[message.className] = db.getClass(message.className)
+
+                val doc = db.newVertex(dbClasses[message.className])
                 doc.setProperty("_id", message.id)
                 for ((k, v) in message.properties) {
                     doc.setProperty(k, v)
                 }
-                doc.save<OVertex>(message.className.lowercase() + orientDB.clusterSuffix)
+                doc.save<OVertex>()
                 savedVertices[message.id] = doc
             }
 
-            //this.updateCache(uniqueMessages)
             db.commit()
             db.declareIntent(null)
         }
@@ -86,11 +98,16 @@ class DbWriter(
             db.declareIntent(OIntentMassiveInsert())
             db.begin(OTransaction.TXTYPE.OPTIMISTIC)
 
+            val dbClasses = mutableMapOf<String, OClass>()
+
             for (message in messages) {
+                if (!dbClasses.containsKey(message.className))
+                    dbClasses[message.className] = db.getClass(message.className)
+
                 val fromId = message.properties["fromId"]!!
                 val toId = message.properties["toId"]!!
-                val doc = db.newEdge(cache[fromId], cache[toId], message.className)
-                doc.save<OEdge>(message.className.lowercase() + orientDB.clusterSuffix)
+                val doc = db.newEdge(cache[fromId], cache[toId], dbClasses[message.className])
+                doc.save<OEdge>()
                 written++
             }
 
@@ -101,17 +118,14 @@ class DbWriter(
         logger.info("Wrote {} edges", written)
     }
 
-    private fun filterNonCached(messages: List<VkMessage>): List<VkMessage> {
-        val unique = HashSet(messages).toList()
-
-        return redis.opsForValue().multiGet(unique.map { it.id })!!
-            .withIndex()
-            .filter { it.value == null }
-            .map { messages[it.index] }
+    private fun getNonDuplicatedIdsFromRedis(messages: List<VkMessage>): Set<String> {
+        val ids = messages.map { it.id }.toSet()
+        val duplicates = redis.opsForSet().intersect(collectionName, ids)!!
+        return ids.filterNotTo(HashSet()) { duplicates.contains(it) }
     }
 
-    private fun updateCache(messages: List<VkMessage>) {
-        logger.info("Updating cache with ${messages.size} keys...")
-        redis.opsForValue().multiSet(messages.associate { it.id to "" })
+    private fun addToRedis(ids: Collection<String>) {
+        redis.opsForSet().add(collectionName, *ids.toTypedArray())
+        logger.info("Updated redis with ${ids.size} keys...")
     }
 }

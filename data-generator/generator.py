@@ -22,7 +22,7 @@ def push_data():
             }
         }
 
-        producer.send('vk_data', key=bytearray(f"P{i}", 'utf-8'), value=entity, partition=i % 2) \
+        producer.send('vk_data', key=bytearray(f"P{i}", 'utf-8'), value=entity) \
             .add_errback(on_send_error)
 
         if i > 10 and i % 2 == 0:
@@ -41,8 +41,8 @@ def push_data():
                 }
             }
 
-            producer.send('vk_data', key=bytearray(f"E{i}", 'utf-8'), value=link, partition=random.randint(0, 1)) \
-                .add_errback(on_send_error)
+            #producer.send('vk_data', key=bytearray(f"E{i}", 'utf-8'), value=link, partition=random.randint(0, 1)) \
+            #    .add_errback(on_send_error)
 
     producer.flush()
 
