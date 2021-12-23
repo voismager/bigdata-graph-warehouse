@@ -1,7 +1,7 @@
 # Graphs Warehouse & Processing System
 ## Архитектура. 
 
-[![архитектура проекта](https://miro.com/app/board/uXjVOZIlUE8=/?moveToWidget=3458764515611887184&cot=14)]
+![архитектура проекта](architecture.jpg)
 ### Используемые фреймворки. 
 
 |       Сервисы       |                                             Описание                                             |
@@ -31,13 +31,13 @@
 - Есть вероятность потерять данные, если БД упадет а запись будет в Redis. \
 Решение -- сначала записывать в БД а потом проверять на дубликаты в Redis
 
-### Как правильно какать:
-   - Шаг 1 -- инициализировать БД (потому что не встает):\
-docker-compose up -d odb1 odb2 odb-init
+### Запуск:
+   - Шаг 1 -- инициализировать БД (подождать 90 секунд):\
+``docker-compose up -d odb1 odb2 odb-init``
    - Шаг 2 -- запустить остальные образы:\
-docker-compose up -d
+``docker-compose up -d``
    - Шаг 3 -- Есть вариант запустить кастомный генератор:\
-python data-generator/generator.py
+``python data-generator/generator.py``
    - Шаг 4 -- Или использовать генератор от Фрола, тут стоит дополнить
 
 UI OrientDB: [OrientDB1](http://localhost:2481)  [OrientDB2](http://localhost:2482)
