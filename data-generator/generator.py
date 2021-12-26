@@ -14,7 +14,7 @@ def push_data():
         value_serializer=lambda x: dumps(x).encode('utf-8'))
 
     total_users = 100
-    total_posts = 10
+    total_posts = 1000
 
     for i in range(total_users):
         user = {
@@ -40,47 +40,55 @@ def push_data():
         producer.send('vk_data', key=bytearray(f"P{i}", 'utf-8'), value=post, partition=0) \
             .add_errback(on_send_error)
 
-    for i in range(int(total_users / 2)):
+    for i in range(total_users):
         user_1_id = f"User_{i}"
-        user_2_id = f"User_{i+1}"
-        friendof_id = f"FriendOf_{i}"
 
-        link = {
-            "id": friendof_id,
-            "typeName": "E",
-            "className": "FriendOf",
-            "properties": {
-                "fromId": user_1_id,
-                "fromClass": "User",
-                "toId": user_2_id,
-                "toClass": "User"
+        for j in range(random.randint(0, 4)):
+            while True:
+                user_2_id = f"User_{random.randint(0, total_users-1)}"
+                if user_1_id != user_2_id:
+                    break
+
+            friendof_id = f"FriendOf_{user_1_id}_{user_2_id}"
+
+            edge = {
+                "id": friendof_id,
+                "typeName": "E",
+                "className": "FriendOf",
+                "properties": {
+                    "fromId": user_1_id,
+                    "fromClass": "User",
+                    "toId": user_2_id,
+                    "toClass": "User"
+                }
             }
-        }
 
-        print(link)
-        producer.send('vk_data', key=bytearray(friendof_id, 'utf-8'), value=link, partition=0) \
-            .add_errback(on_send_error)
+            print(edge)
+            producer.send('vk_data', key=bytearray(friendof_id, 'utf-8'), value=edge, partition=0) \
+                .add_errback(on_send_error)
 
     for i in range(total_posts):
-        user_id = f"User_{i}"
         post_id = f"Post_{i}"
-        friendof_id = f"Likes_{i}"
 
-        link = {
-            "id": friendof_id,
-            "typeName": "E",
-            "className": "Likes",
-            "properties": {
-                "fromId": user_id,
-                "fromClass": "User",
-                "toId": post_id,
-                "toClass": "Post"
+        for j in range(random.randint(0, 4)):
+            user_id = f"User_{random.randint(0, total_users-1)}"
+            likes_id = f"Likes_{user_id}_{post_id}"
+
+            edge = {
+                "id": likes_id,
+                "typeName": "E",
+                "className": "Likes",
+                "properties": {
+                    "fromId": user_id,
+                    "fromClass": "User",
+                    "toId": post_id,
+                    "toClass": "Post"
+                }
             }
-        }
 
-        print(link)
-        producer.send('vk_data', key=bytearray(friendof_id, 'utf-8'), value=link, partition=0) \
-            .add_errback(on_send_error)
+            print(edge)
+            producer.send('vk_data', key=bytearray(likes_id, 'utf-8'), value=edge, partition=0) \
+                .add_errback(on_send_error)
 
     producer.flush()
 
